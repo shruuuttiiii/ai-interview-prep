@@ -5,10 +5,12 @@ import io
 from groq import Groq
 from dotenv import load_dotenv
 import os
+import tempfile
 
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
 
 app = FastAPI()
 
@@ -50,6 +52,20 @@ async def generate_questions(data: dict):
         messages=[{"role": "user", "content": prompt}]
     )
     return {"questions": response.choices[0].message.content}
+
+@app.post("/transcribe")
+async def transcribe_audio(file: UploadFile = File(...)):
+    contents = await file.read()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+        tmp.write(contents)
+        tmp_path = tmp.name
+    with open(tmp_path, "rb") as audio_file:
+        transcription = client.audio.transcriptions.create(
+            file=("recording.webm", audio_file, "audio/webm"),
+            model="whisper-large-v3",
+        )
+    os.unlink(tmp_path)
+    return {"transcript": transcription.text}
 
 @app.post("/get-feedback")
 async def get_feedback(data: dict):
