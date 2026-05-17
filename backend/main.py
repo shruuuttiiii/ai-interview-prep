@@ -50,3 +50,26 @@ async def generate_questions(data: dict):
         messages=[{"role": "user", "content": prompt}]
     )
     return {"questions": response.choices[0].message.content}
+
+@app.post("/get-feedback")
+async def get_feedback(data: dict):
+    answer = data.get("answer", "")
+    questions = data.get("questions", "")
+    prompt = f"""
+    The candidate was asked these interview questions:
+    {questions}
+
+    Their answer was:
+    {answer}
+
+    Please provide:
+    1. Confidence Score (out of 100)
+    2. What they did well
+    3. What they can improve
+    4. Overall rating (Excellent/Good/Average/Poor)
+    """
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return {"feedback": response.choices[0].message.content}
