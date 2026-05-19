@@ -6,11 +6,30 @@ from groq import Groq
 from dotenv import load_dotenv
 import os
 import tempfile
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+# Database setup
+engine = create_engine("sqlite:///interview_sessions.db")
+Base = declarative_base()
+
+class Session(Base):
+    __tablename__ = "sessions"
+    id = Column(Integer, primary_key=True)
+    questions = Column(Text)
+    answer = Column(Text)
+    feedback = Column(Text)
+    score = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+Base.metadata.create_all(engine)
+SessionLocal = sessionmaker(bind=engine)
 
 app = FastAPI()
 
@@ -41,11 +60,25 @@ async def upload_resume(file: UploadFile = File(...)):
 @app.post("/generate-questions")
 async def generate_questions(data: dict):
     resume_text = data.get("resume_text", "")
+    role = data.get("role", "")
+    mode = data.get("mode", "")
     prompt = f"""
-    Based on this resume, generate 5 interview questions:
+    You are an expert interviewer. Generate 5 interview questions for:
+    Role: {role}
+    Interview Mode: {mode}
+    
+    Candidate Resume:
     {resume_text}
-    Mix technical and behavioral questions based on their skills.
-    Format as numbered list only.
+    
+    Generate questions strictly based on the interview mode:
+    - If HR Round: behavioral, situational, personality questions
+    - If Coding Round: DSA, problem solving, coding questions
+    - If Technical Round: deep technical knowledge questions
+    - If GK/Awareness Round: general knowledge, current affairs questions
+    - If Aptitude Round: numerical, logical reasoning questions
+    - For any other mode: relevant questions matching that mode
+    
+    Format as numbered list only. No extra text.
     """
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -88,4 +121,34 @@ async def get_feedback(data: dict):
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}]
     )
-    return {"feedback": response.choices[0].message.content}
+    feedback_text = response.choices[0].message.content
+
+    # Save to database
+    db = SessionLocal()
+    session = Session(
+        questions=questions,
+        answer=answer,
+        feedback=feedback_text,
+        created_at=datetime.utcnow()
+    )
+    db.add(session)
+    db.commit()
+    db.close()
+
+    return {"feedback": feedback_text}
+
+@app.get("/sessions")
+def get_sessions():
+    db = SessionLocal()
+    sessions = db.query(Session).order_by(Session.created_at.desc()).all()
+    db.close()
+    return [
+        {
+            "id": s.id,
+            "questions": s.questions[:100],
+            "answer": s.answer[:100],
+            "feedback": s.feedback[:200],
+            "created_at": str(s.created_at)
+        }
+        for s in sessions
+    ]
