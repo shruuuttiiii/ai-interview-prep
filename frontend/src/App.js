@@ -131,6 +131,8 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [idealAnswer, setIdealAnswer] = useState('');
+  const [showIdeal, setShowIdeal] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -285,6 +287,23 @@ function App() {
     });
     const data = await response.json();
     setFeedback(data.feedback);
+    setLoading(false);
+  };
+  const getIdealAnswer = async () => {
+    setLoading(true);
+    const response = await fetch('http://localhost:8000/ideal-answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        questions: questions, 
+        role: selectedRole.label, 
+        mode: selectedMode,
+        user_answer: transcript 
+      }),
+    });
+    const data = await response.json();
+    setIdealAnswer(data.ideal_answer);
+    setShowIdeal(true);
     setLoading(false);
   };
 
@@ -581,10 +600,23 @@ function App() {
           <div style={{ background: 'rgba(255,255,255,0.15)', padding: '25px', borderRadius: '12px', marginBottom: '15px', backdropFilter: 'blur(10px)' }}>
             <h3 style={{ color: 'white', marginTop: 0 }}>📊 AI Feedback</h3>
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)' }}>{feedback}</pre>
+            
+            <button onClick={getIdealAnswer} disabled={loading}
+              style={{ marginTop: '15px', padding: '10px 25px', background: '#FF6F00', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px', marginRight: '10px' }}>
+              {loading ? '⏳ Loading...' : '💡 Show Ideal Answer'}
+            </button>
+
             <button onClick={resetAll}
               style={{ marginTop: '15px', padding: '10px 25px', background: selectedRole.text, color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
               🔄 Start New Session
             </button>
+
+            {showIdeal && idealAnswer && (
+              <div style={{ background: 'rgba(0,255,0,0.1)', padding: '20px', borderRadius: '12px', marginTop: '20px', border: '1px solid rgba(0,255,0,0.3)' }}>
+                <h3 style={{ color: '#64ffda', marginTop: 0 }}>💡 Ideal Answer & Comparison</h3>
+                <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)' }}>{idealAnswer}</pre>
+              </div>
+            )}
           </div>
         )}
       </div>

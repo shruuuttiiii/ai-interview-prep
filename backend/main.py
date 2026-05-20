@@ -15,7 +15,6 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Database setup
 engine = create_engine("sqlite:///interview_sessions.db")
 Base = declarative_base()
 
@@ -128,7 +127,6 @@ async def get_feedback(data: dict):
     )
     feedback_text = response.choices[0].message.content
 
-    # Save to database
     db = SessionLocal()
     session = Session(
         email=email,
@@ -163,3 +161,31 @@ def get_sessions(email: str = "guest"):
         }
         for s in sessions
     ]
+
+@app.post("/ideal-answer")
+async def ideal_answer(data: dict):
+    questions = data.get("questions", "")
+    role = data.get("role", "")
+    mode = data.get("mode", "")
+    user_answer = data.get("user_answer", "")
+    prompt = f"""
+    Role: {role}
+    Interview Mode: {mode}
+
+    Question asked: {questions}
+
+    Candidate's answer: {user_answer}
+
+    Please provide:
+    1. ✅ IDEAL ANSWER — What a perfect answer looks like for this role and mode
+    2. 🔑 KEY POINTS — 3-5 bullet points the candidate should have mentioned
+    3. 📊 COMPARISON — How candidate's answer compares to ideal (what they got right, what they missed)
+    4. 💡 PRO TIP — One expert tip specific to {mode} interviews
+
+    Keep it practical and specific to {role} {mode}.
+    """
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return {"ideal_answer": response.choices[0].message.content}
