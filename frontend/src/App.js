@@ -136,8 +136,50 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedRole, setSelectedRole] = useState(null);
   const [selectedMode, setSelectedMode] = useState(null);
+  const [warnings, setWarnings] = useState(0);
+  const [interviewEnded, setInterviewEnded] = useState(false);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+
+  useEffect(() => {
+    if (step < 3) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setWarnings(prev => {
+          const newCount = prev + 1;
+          if (newCount >= 3) {
+            setInterviewEnded(true);
+            alert('🚨 Interview Terminated! You switched tabs 3 times. This is recorded.');
+          } else {
+            alert(`⚠️ Warning ${newCount}/3! Do not switch tabs during the interview!`);
+          }
+          return newCount;
+        });
+      }
+    };
+
+    const handleBlur = () => {
+      setWarnings(prev => {
+        const newCount = prev + 1;
+        if (newCount >= 3) {
+          setInterviewEnded(true);
+          alert('🚨 Interview Terminated! You left the window 3 times. This is recorded.');
+        } else {
+          alert(`⚠️ Warning ${newCount}/3! Do not leave the interview window!`);
+        }
+        return newCount;
+      });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [step]);
 
   useEffect(() => {
     const saved = localStorage.getItem('ai_interview_email');
@@ -484,6 +526,25 @@ function App() {
             <button onClick={generateQuestions} disabled={loading}
               style={{ padding: '10px 25px', background: selectedRole.text, color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}>
               {loading ? '⏳ Generating...' : `🤖 Generate ${selectedMode} Questions`}
+            </button>
+          </div>
+        )}
+        {step >= 3 && warnings > 0 && (
+          <div style={{ background: 'rgba(255,0,0,0.3)', padding: '12px 20px', borderRadius: '8px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '20px' }}>⚠️</span>
+            <p style={{ color: 'white', margin: 0, fontSize: '14px' }}>
+              <strong>Warning {warnings}/3</strong> — Do not switch tabs or leave this window during the interview!
+            </p>
+          </div>
+        )}
+
+        {interviewEnded && (
+          <div style={{ background: 'rgba(255,0,0,0.5)', padding: '25px', borderRadius: '12px', marginBottom: '15px', textAlign: 'center', backdropFilter: 'blur(10px)' }}>
+            <h2 style={{ color: 'white', marginTop: 0 }}>🚨 Interview Terminated!</h2>
+            <p style={{ color: 'rgba(255,255,255,0.9)' }}>You switched tabs/windows 3 times. This behavior has been recorded.</p>
+            <button onClick={() => { resetAll(); setWarnings(0); setInterviewEnded(false); }}
+              style={{ padding: '10px 25px', background: 'white', color: '#c00', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
+              🔄 Start Over
             </button>
           </div>
         )}
