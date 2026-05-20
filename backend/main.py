@@ -22,10 +22,12 @@ Base = declarative_base()
 class Session(Base):
     __tablename__ = "sessions"
     id = Column(Integer, primary_key=True)
+    email = Column(String)
+    role = Column(String)
+    mode = Column(String)
     questions = Column(Text)
     answer = Column(Text)
     feedback = Column(Text)
-    score = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(engine)
@@ -66,10 +68,10 @@ async def generate_questions(data: dict):
     You are an expert interviewer. Generate 5 interview questions for:
     Role: {role}
     Interview Mode: {mode}
-    
+
     Candidate Resume:
     {resume_text}
-    
+
     Generate questions strictly based on the interview mode:
     - If HR Round: behavioral, situational, personality questions
     - If Coding Round: DSA, problem solving, coding questions
@@ -77,7 +79,7 @@ async def generate_questions(data: dict):
     - If GK/Awareness Round: general knowledge, current affairs questions
     - If Aptitude Round: numerical, logical reasoning questions
     - For any other mode: relevant questions matching that mode
-    
+
     Format as numbered list only. No extra text.
     """
     response = client.chat.completions.create(
@@ -104,6 +106,9 @@ async def transcribe_audio(file: UploadFile = File(...)):
 async def get_feedback(data: dict):
     answer = data.get("answer", "")
     questions = data.get("questions", "")
+    email = data.get("email", "guest")
+    role = data.get("role", "")
+    mode = data.get("mode", "")
     prompt = f"""
     The candidate was asked these interview questions:
     {questions}
@@ -126,6 +131,9 @@ async def get_feedback(data: dict):
     # Save to database
     db = SessionLocal()
     session = Session(
+        email=email,
+        role=role,
+        mode=mode,
         questions=questions,
         answer=answer,
         feedback=feedback_text,
@@ -138,13 +146,16 @@ async def get_feedback(data: dict):
     return {"feedback": feedback_text}
 
 @app.get("/sessions")
-def get_sessions():
+def get_sessions(email: str = "guest"):
     db = SessionLocal()
-    sessions = db.query(Session).order_by(Session.created_at.desc()).all()
+    sessions = db.query(Session).filter(Session.email == email).order_by(Session.created_at.desc()).all()
     db.close()
     return [
         {
             "id": s.id,
+            "email": s.email,
+            "role": s.role,
+            "mode": s.mode,
             "questions": s.questions[:100],
             "answer": s.answer[:100],
             "feedback": s.feedback[:200],

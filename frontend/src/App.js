@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 const CATEGORIES = [
   {
@@ -114,7 +114,15 @@ const CATEGORIES = [
   },
 ];
 
+const BG = 'linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("https://images.unsplash.com/photo-1573164713988-8665fc963095?w=1200")';
+
 function App() {
+  const [authMode, setAuthMode] = useState('checking'); // checking, welcome-back, login, register
+  const [savedEmail, setSavedEmail] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loggedInEmail, setLoggedInEmail] = useState('');
   const [file, setFile] = useState(null);
   const [resumeText, setResumeText] = useState('');
   const [questions, setQuestions] = useState('');
@@ -130,6 +138,47 @@ function App() {
   const [selectedMode, setSelectedMode] = useState(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('ai_interview_email');
+    if (saved) {
+      setSavedEmail(saved);
+      setAuthMode('welcome-back');
+    } else {
+      setAuthMode('register');
+    }
+  }, []);
+
+  const handleRegister = () => {
+    if (!email.includes('@')) return alert('Please enter a valid email!');
+    if (password.length < 6) return alert('Password must be at least 6 characters!');
+    if (password !== confirmPassword) return alert('Passwords do not match!');
+    localStorage.setItem('ai_interview_email', email);
+    localStorage.setItem('ai_interview_pass_' + email, password);
+    setLoggedInEmail(email);
+    setAuthMode('done');
+  };
+
+  const handleLogin = () => {
+    const savedPass = localStorage.getItem('ai_interview_pass_' + savedEmail);
+    if (password !== savedPass) return alert('Wrong password! Please try again.');
+    setLoggedInEmail(savedEmail);
+    setAuthMode('done');
+  };
+
+  const handleUseDifferentAccount = () => {
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setAuthMode('register');
+  };
+
+  const handleLogout = () => {
+    setLoggedInEmail('');
+    setPassword('');
+    setAuthMode('welcome-back');
+    resetAll();
+  };
 
   const uploadResume = async () => {
     if (!file) return alert('Please select a PDF file first!');
@@ -190,7 +239,7 @@ function App() {
     const response = await fetch('http://localhost:8000/get-feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answer: transcript, questions: questions, mode: selectedMode }),
+      body: JSON.stringify({ answer: transcript, questions: questions, email: loggedInEmail, role: selectedRole.label, mode: selectedMode }),
     });
     const data = await response.json();
     setFeedback(data.feedback);
@@ -198,7 +247,7 @@ function App() {
   };
 
   const loadSessions = async () => {
-    const response = await fetch('http://localhost:8000/sessions');
+    const response = await fetch(`http://localhost:8000/sessions?email=${loggedInEmail}`);
     const data = await response.json();
     setSessions(data);
     setShowHistory(true);
@@ -210,7 +259,7 @@ function App() {
     setSelectedCategory(null); setSelectedRole(null); setSelectedMode(null);
   };
 
-  const btnStyle = (text) => ({
+  const btnStyle = () => ({
     padding: '18px 15px',
     background: 'rgba(255,255,255,0.15)',
     border: '2px solid rgba(255,255,255,0.3)',
@@ -218,17 +267,95 @@ function App() {
     cursor: 'pointer', backdropFilter: 'blur(10px)', textAlign: 'center',
   });
 
-  // Screen 1 — Category
+  const inputStyle = {
+    width: '100%', padding: '12px', borderRadius: '8px', border: 'none',
+    fontSize: '15px', marginBottom: '12px', background: 'rgba(255,255,255,0.9)',
+    boxSizing: 'border-box'
+  };
+
+  const cardStyle = {
+    background: 'rgba(255,255,255,0.1)', padding: '40px', borderRadius: '16px',
+    maxWidth: '400px', width: '100%', backdropFilter: 'blur(10px)'
+  };
+
+  // Checking localStorage
+  if (authMode === 'checking') {
+    return <div style={{ minHeight: '100vh', background: BG, backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: 'white', fontSize: '18px' }}>⏳ Loading...</p>
+    </div>;
+  }
+
+  // Welcome Back Screen
+  if (authMode === 'welcome-back') {
+    return (
+      <div style={{ minHeight: '100vh', background: BG, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <h1 style={{ color: 'white', fontSize: '36px', marginBottom: '30px' }}>🤖 AI Interview Prep</h1>
+        <div style={cardStyle}>
+          <h3 style={{ color: 'white', marginTop: 0, textAlign: 'center' }}>👋 Welcome Back!</h3>
+          <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', marginBottom: '20px' }}>Continue as:</p>
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center' }}>
+            <p style={{ color: '#64ffda', margin: 0, fontSize: '16px', fontWeight: 'bold' }}>📧 {savedEmail}</p>
+          </div>
+          <input type="password" placeholder="Enter your password" value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+            style={inputStyle} />
+          <button onClick={handleLogin}
+            style={{ width: '100%', padding: '12px', background: '#185FA5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
+            🚀 Login
+          </button>
+          <button onClick={handleUseDifferentAccount}
+            style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
+            👤 Use Different Account
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Register Screen
+  if (authMode === 'register') {
+    return (
+      <div style={{ minHeight: '100vh', background: BG, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <h1 style={{ color: 'white', fontSize: '36px', marginBottom: '30px' }}>🤖 AI Interview Prep</h1>
+        <div style={cardStyle}>
+          <h3 style={{ color: 'white', marginTop: 0, textAlign: 'center' }}>👋 Create Account</h3>
+          <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', marginBottom: '20px', fontSize: '14px' }}>Save your progress and session history</p>
+          <input type="email" placeholder="Enter your email" value={email}
+            onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+          <input type="password" placeholder="Create password (min 6 chars)" value={password}
+            onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
+          <input type="password" placeholder="Confirm password" value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
+            style={inputStyle} />
+          <button onClick={handleRegister}
+            style={{ width: '100%', padding: '12px', background: '#185FA5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+            🚀 Create Account & Start
+          </button>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', textAlign: 'center', marginTop: '15px' }}>Your data is saved locally on this device</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Category Screen
   if (!selectedCategory) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("https://images.unsplash.com/photo-1573164713988-8665fc963095?w=1200")',
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px'
-      }}>
+      <div style={{ minHeight: '100vh', background: BG, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ position: 'absolute', top: '20px', right: '20px', display: 'flex', gap: '10px' }}>
+          <button onClick={loadSessions}
+            style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer' }}>
+            📊 My History
+          </button>
+          <button onClick={handleLogout}
+            style={{ padding: '8px 14px', background: 'rgba(255,0,0,0.3)', border: '1px solid rgba(255,0,0,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer' }}>
+            🚪 Logout
+          </button>
+        </div>
+        <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '5px', fontSize: '13px' }}>👤 {loggedInEmail}</p>
         <h1 style={{ color: 'white', fontSize: '36px', marginBottom: '10px', textAlign: 'center' }}>🤖 AI Interview Prep</h1>
-        <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '10px', fontSize: '16px' }}>Step 1 of 3 — Choose your field</p>
+        <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '30px', fontSize: '16px' }}>Step 1 of 3 — Choose your field</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', maxWidth: '500px', width: '100%' }}>
           {CATEGORIES.map((cat, index) => (
             <button key={cat.id} onClick={() => setSelectedCategory(cat)}
@@ -238,18 +365,33 @@ function App() {
             >{cat.label}</button>
           ))}
         </div>
+        {showHistory && (
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '12px', marginTop: '20px', maxWidth: '500px', width: '100%', backdropFilter: 'blur(10px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <h3 style={{ color: 'white', margin: 0 }}>📊 My Sessions</h3>
+              <button onClick={() => setShowHistory(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+            </div>
+            {sessions.length === 0 ? (
+              <p style={{ color: 'rgba(255,255,255,0.7)' }}>No sessions yet!</p>
+            ) : (
+              sessions.map((s) => (
+                <div key={s.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', marginTop: '10px' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', margin: '0 0 3px' }}>📅 {s.created_at} | {s.role} | {s.mode}</p>
+                  <p style={{ color: 'white', fontSize: '13px', margin: '0 0 3px' }}><strong>Q:</strong> {s.questions}...</p>
+                  <p style={{ color: '#64ffda', fontSize: '13px', margin: 0 }}><strong>Feedback:</strong> {s.feedback}...</p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
     );
   }
 
-  // Screen 2 — Role
+  // Role Screen
   if (!selectedRole) {
     return (
-      <div style={{
-        minHeight: '100vh', background: selectedCategory.bg,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px'
-      }}>
+      <div style={{ minHeight: '100vh', background: selectedCategory.bg, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <h1 style={{ color: 'white', fontSize: '32px', marginBottom: '5px', textAlign: 'center' }}>🤖 AI Interview Prep</h1>
         <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '5px', fontSize: '14px' }}>Step 2 of 3 — Choose your role</p>
         <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '25px', fontSize: '13px' }}>Field: {selectedCategory.label}</p>
@@ -270,14 +412,10 @@ function App() {
     );
   }
 
-  // Screen 3 — Mode
+  // Mode Screen
   if (!selectedMode) {
     return (
-      <div style={{
-        minHeight: '100vh', background: selectedCategory.bg,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px'
-      }}>
+      <div style={{ minHeight: '100vh', background: selectedCategory.bg, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <h1 style={{ color: 'white', fontSize: '32px', marginBottom: '5px', textAlign: 'center' }}>🤖 AI Interview Prep</h1>
         <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '5px', fontSize: '14px' }}>Step 3 of 3 — Choose interview mode</p>
         <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '25px', fontSize: '13px' }}>Role: {selectedRole.label}</p>
@@ -298,55 +436,38 @@ function App() {
     );
   }
 
-  // Screen 4 — Main App
+  // Main Interview Screen
   return (
-    <div style={{
-      minHeight: '100vh', background: selectedCategory.bg,
-      backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed',
-      padding: '20px'
-    }}>
+    <div style={{ minHeight: '100vh', background: selectedCategory.bg, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed', padding: '20px' }}>
       <div style={{ maxWidth: '750px', margin: '0 auto' }}>
-
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <h1 style={{ color: 'white', margin: 0, fontSize: '24px' }}>🤖 AI Interview Prep</h1>
-            <p style={{ color: selectedRole.text, margin: '3px 0', fontSize: '13px' }}>Role: {selectedRole.label} | Mode: {selectedMode}</p>
+            <p style={{ color: selectedRole.text, margin: '3px 0', fontSize: '13px' }}>👤 {loggedInEmail} | {selectedRole.label} | {selectedMode}</p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={loadSessions}
-              style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' }}>
-              📊 History
-            </button>
-            <button onClick={resetAll}
-              style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' }}>
-              🔄 Restart
-            </button>
+            <button onClick={loadSessions} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' }}>📊 History</button>
+            <button onClick={resetAll} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' }}>🔄 Restart</button>
+            <button onClick={handleLogout} style={{ padding: '8px 12px', background: 'rgba(255,0,0,0.3)', border: '1px solid rgba(255,0,0,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' }}>🚪 Logout</button>
           </div>
         </div>
 
-        {/* Session History */}
         {showHistory && (
           <div style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '12px', marginBottom: '20px', backdropFilter: 'blur(10px)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <h3 style={{ color: 'white', margin: 0 }}>📊 Session History</h3>
+              <h3 style={{ color: 'white', margin: 0 }}>📊 My Session History</h3>
               <button onClick={() => setShowHistory(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px' }}>✕</button>
             </div>
-            {sessions.length === 0 ? (
-              <p style={{ color: 'rgba(255,255,255,0.7)' }}>No sessions yet!</p>
-            ) : (
-              sessions.map((s) => (
-                <div key={s.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', marginTop: '10px' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', margin: '0 0 5px' }}>📅 {s.created_at}</p>
-                  <p style={{ color: 'white', fontSize: '13px', margin: '0 0 3px' }}><strong>Q:</strong> {s.questions}...</p>
-                  <p style={{ color: selectedRole.text, fontSize: '13px', margin: 0 }}><strong>Feedback:</strong> {s.feedback}...</p>
-                </div>
-              ))
-            )}
+            {sessions.length === 0 ? <p style={{ color: 'rgba(255,255,255,0.7)' }}>No sessions yet!</p> : sessions.map((s) => (
+              <div key={s.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', marginTop: '10px' }}>
+                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', margin: '0 0 3px' }}>📅 {s.created_at} | {s.role} | {s.mode}</p>
+                <p style={{ color: 'white', fontSize: '13px', margin: '0 0 3px' }}><strong>Q:</strong> {s.questions}...</p>
+                <p style={{ color: selectedRole.text, fontSize: '13px', margin: 0 }}><strong>Feedback:</strong> {s.feedback}...</p>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Step 1 */}
         <div style={{ background: 'rgba(255,255,255,0.1)', padding: '25px', borderRadius: '12px', marginBottom: '15px', backdropFilter: 'blur(10px)' }}>
           <h3 style={{ color: 'white', marginTop: 0 }}>📄 Step 1 — Upload Your Resume</h3>
           <input type="file" accept=".pdf" onChange={(e) => setFile(e.target.files[0])} style={{ margin: '10px 0', color: 'white' }} />
@@ -357,7 +478,6 @@ function App() {
           </button>
         </div>
 
-        {/* Step 2 */}
         {step >= 2 && (
           <div style={{ background: 'rgba(255,255,255,0.1)', padding: '25px', borderRadius: '12px', marginBottom: '15px', backdropFilter: 'blur(10px)' }}>
             <h3 style={{ color: 'white', marginTop: 0 }}>✅ Resume Uploaded!</h3>
@@ -368,15 +488,12 @@ function App() {
           </div>
         )}
 
-        {/* Step 3 */}
         {step >= 3 && (
           <div style={{ background: 'rgba(255,255,255,0.1)', padding: '25px', borderRadius: '12px', marginBottom: '15px', backdropFilter: 'blur(10px)' }}>
             <h3 style={{ color: 'white', marginTop: 0 }}>🎯 {selectedMode} Questions</h3>
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)' }}>{questions}</pre>
-
             <h3 style={{ color: 'white' }}>🎙️ Record Your Answer</h3>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Works on ALL browsers!</p>
-
             <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
               <button onClick={startRecording} disabled={isRecording}
                 style={{ padding: '10px 20px', background: isRecording ? '#555' : '#e53935', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
@@ -387,14 +504,11 @@ function App() {
                 ⏹️ Stop & Transcribe
               </button>
             </div>
-
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>Or type your answer:</p>
             <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)}
               placeholder="Speak or type your answer here..."
               style={{ width: '100%', height: '100px', padding: '10px', borderRadius: '8px', border: 'none', fontSize: '14px', marginBottom: '15px', background: 'rgba(255,255,255,0.9)' }} />
-
             {loading && <p style={{ color: selectedRole.text }}>⏳ Processing...</p>}
-
             <button onClick={getAIFeedback} disabled={loading || !transcript}
               style={{ padding: '10px 25px', background: '#7B1FA2', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px' }}>
               {loading ? '⏳ Analyzing...' : '📊 Get AI Feedback & Score'}
@@ -402,7 +516,6 @@ function App() {
           </div>
         )}
 
-        {/* Feedback */}
         {feedback && (
           <div style={{ background: 'rgba(255,255,255,0.15)', padding: '25px', borderRadius: '12px', marginBottom: '15px', backdropFilter: 'blur(10px)' }}>
             <h3 style={{ color: 'white', marginTop: 0 }}>📊 AI Feedback</h3>
@@ -413,7 +526,6 @@ function App() {
             </button>
           </div>
         )}
-
       </div>
     </div>
   );
