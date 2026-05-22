@@ -63,6 +63,7 @@ async def generate_questions(data: dict):
     resume_text = data.get("resume_text", "")
     role = data.get("role", "")
     mode = data.get("mode", "")
+    language = data.get("language", "English")
     prompt = f"""
     You are an expert interviewer. Generate 5 interview questions for:
     Role: {role}
@@ -79,6 +80,8 @@ async def generate_questions(data: dict):
     - If Aptitude Round: numerical, logical reasoning questions
     - For any other mode: relevant questions matching that mode
 
+    Language: {language}
+    Generate all questions in {language} language only.
     Format as numbered list only. No extra text.
     """
     response = client.chat.completions.create(
@@ -108,6 +111,7 @@ async def get_feedback(data: dict):
     email = data.get("email", "guest")
     role = data.get("role", "")
     mode = data.get("mode", "")
+    language = data.get("language", "English")
     prompt = f"""
     The candidate was asked these interview questions:
     {questions}
@@ -115,7 +119,7 @@ async def get_feedback(data: dict):
     Their answer was:
     {answer}
 
-    Please provide:
+    Please provide in {language} language:
     1. Confidence Score (out of 100)
     2. What they did well
     3. What they can improve
@@ -168,6 +172,7 @@ async def ideal_answer(data: dict):
     role = data.get("role", "")
     mode = data.get("mode", "")
     user_answer = data.get("user_answer", "")
+    language = data.get("language", "English")
     prompt = f"""
     Role: {role}
     Interview Mode: {mode}
@@ -183,6 +188,7 @@ async def ideal_answer(data: dict):
     4. 💡 PRO TIP — One expert tip specific to {mode} interviews
 
     Keep it practical and specific to {role} {mode}.
+    Respond in {language} language only.
     """
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",

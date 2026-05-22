@@ -117,12 +117,13 @@ const CATEGORIES = [
 const BG = 'linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("https://images.unsplash.com/photo-1573164713988-8665fc963095?w=1200")';
 
 function App() {
-  const [authMode, setAuthMode] = useState('checking'); // checking, welcome-back, login, register
+  const [authMode, setAuthMode] = useState('checking');
   const [savedEmail, setSavedEmail] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loggedInEmail, setLoggedInEmail] = useState('');
+  const [language, setLanguage] = useState('English');
   const [file, setFile] = useState(null);
   const [resumeText, setResumeText] = useState('');
   const [questions, setQuestions] = useState('');
@@ -144,46 +145,6 @@ function App() {
   const chunksRef = useRef([]);
 
   useEffect(() => {
-    if (step < 3) return;
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setWarnings(prev => {
-          const newCount = prev + 1;
-          if (newCount >= 3) {
-            setInterviewEnded(true);
-            alert('🚨 Interview Terminated! You switched tabs 3 times. This is recorded.');
-          } else {
-            alert(`⚠️ Warning ${newCount}/3! Do not switch tabs during the interview!`);
-          }
-          return newCount;
-        });
-      }
-    };
-
-    const handleBlur = () => {
-      setWarnings(prev => {
-        const newCount = prev + 1;
-        if (newCount >= 3) {
-          setInterviewEnded(true);
-          alert('🚨 Interview Terminated! You left the window 3 times. This is recorded.');
-        } else {
-          alert(`⚠️ Warning ${newCount}/3! Do not leave the interview window!`);
-        }
-        return newCount;
-      });
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
-    };
-  }, [step]);
-
-  useEffect(() => {
     const saved = localStorage.getItem('ai_interview_email');
     if (saved) {
       setSavedEmail(saved);
@@ -192,6 +153,42 @@ function App() {
       setAuthMode('register');
     }
   }, []);
+
+  useEffect(() => {
+    if (step < 3) return;
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setWarnings(prev => {
+          const newCount = prev + 1;
+          if (newCount >= 3) {
+            setInterviewEnded(true);
+            alert('🚨 Interview Terminated! You switched tabs 3 times.');
+          } else {
+            alert(`⚠️ Warning ${newCount}/3! Do not switch tabs during the interview!`);
+          }
+          return newCount;
+        });
+      }
+    };
+    const handleBlur = () => {
+      setWarnings(prev => {
+        const newCount = prev + 1;
+        if (newCount >= 3) {
+          setInterviewEnded(true);
+          alert('🚨 Interview Terminated! You left the window 3 times.');
+        } else {
+          alert(`⚠️ Warning ${newCount}/3! Do not leave the interview window!`);
+        }
+        return newCount;
+      });
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [step]);
 
   const handleRegister = () => {
     if (!email.includes('@')) return alert('Please enter a valid email!');
@@ -211,15 +208,12 @@ function App() {
   };
 
   const handleUseDifferentAccount = () => {
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
+    setEmail(''); setPassword(''); setConfirmPassword('');
     setAuthMode('register');
   };
 
   const handleLogout = () => {
-    setLoggedInEmail('');
-    setPassword('');
+    setLoggedInEmail(''); setPassword('');
     setAuthMode('welcome-back');
     resetAll();
   };
@@ -241,7 +235,7 @@ function App() {
     const response = await fetch('http://localhost:8000/generate-questions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resume_text: resumeText, role: selectedRole.label, mode: selectedMode }),
+      body: JSON.stringify({ resume_text: resumeText, role: selectedRole.label, mode: selectedMode, language }),
     });
     const data = await response.json();
     setQuestions(data.questions);
@@ -283,23 +277,19 @@ function App() {
     const response = await fetch('http://localhost:8000/get-feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answer: transcript, questions: questions, email: loggedInEmail, role: selectedRole.label, mode: selectedMode }),
+      body: JSON.stringify({ answer: transcript, questions, email: loggedInEmail, role: selectedRole.label, mode: selectedMode, language }),
     });
     const data = await response.json();
     setFeedback(data.feedback);
     setLoading(false);
   };
+
   const getIdealAnswer = async () => {
     setLoading(true);
     const response = await fetch('http://localhost:8000/ideal-answer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        questions: questions, 
-        role: selectedRole.label, 
-        mode: selectedMode,
-        user_answer: transcript 
-      }),
+      body: JSON.stringify({ questions, role: selectedRole.label, mode: selectedMode, user_answer: transcript, language }),
     });
     const data = await response.json();
     setIdealAnswer(data.ideal_answer);
@@ -317,7 +307,9 @@ function App() {
   const resetAll = () => {
     setStep(1); setFile(null); setResumeText('');
     setQuestions(''); setTranscript(''); setFeedback('');
+    setIdealAnswer(''); setShowIdeal(false);
     setSelectedCategory(null); setSelectedRole(null); setSelectedMode(null);
+    setWarnings(0); setInterviewEnded(false);
   };
 
   const btnStyle = () => ({
@@ -339,14 +331,12 @@ function App() {
     maxWidth: '400px', width: '100%', backdropFilter: 'blur(10px)'
   };
 
-  // Checking localStorage
   if (authMode === 'checking') {
     return <div style={{ minHeight: '100vh', background: BG, backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <p style={{ color: 'white', fontSize: '18px' }}>⏳ Loading...</p>
     </div>;
   }
 
-  // Welcome Back Screen
   if (authMode === 'welcome-back') {
     return (
       <div style={{ minHeight: '100vh', background: BG, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -374,7 +364,6 @@ function App() {
     );
   }
 
-  // Register Screen
   if (authMode === 'register') {
     return (
       <div style={{ minHeight: '100vh', background: BG, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -400,11 +389,14 @@ function App() {
     );
   }
 
-  // Category Screen
   if (!selectedCategory) {
     return (
       <div style={{ minHeight: '100vh', background: BG, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ position: 'absolute', top: '20px', right: '20px', display: 'flex', gap: '10px' }}>
+          <button onClick={() => setLanguage(language === 'English' ? 'Hindi' : 'English')}
+            style={{ padding: '8px 14px', background: language === 'Hindi' ? '#FF9800' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer' }}>
+            {language === 'English' ? '🇮🇳 Hindi' : '🇬🇧 English'}
+          </button>
           <button onClick={loadSessions}
             style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer' }}>
             📊 My History
@@ -449,7 +441,6 @@ function App() {
     );
   }
 
-  // Role Screen
   if (!selectedRole) {
     return (
       <div style={{ minHeight: '100vh', background: selectedCategory.bg, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -473,7 +464,6 @@ function App() {
     );
   }
 
-  // Mode Screen
   if (!selectedMode) {
     return (
       <div style={{ minHeight: '100vh', background: selectedCategory.bg, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -497,16 +487,20 @@ function App() {
     );
   }
 
-  // Main Interview Screen
   return (
     <div style={{ minHeight: '100vh', background: selectedCategory.bg, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed', padding: '20px' }}>
       <div style={{ maxWidth: '750px', margin: '0 auto' }}>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <h1 style={{ color: 'white', margin: 0, fontSize: '24px' }}>🤖 AI Interview Prep</h1>
             <p style={{ color: selectedRole.text, margin: '3px 0', fontSize: '13px' }}>👤 {loggedInEmail} | {selectedRole.label} | {selectedMode}</p>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button onClick={() => setLanguage(language === 'English' ? 'Hindi' : 'English')}
+              style={{ padding: '8px 12px', background: language === 'Hindi' ? '#FF9800' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' }}>
+              {language === 'English' ? '🇮🇳 Hindi' : '🇬🇧 English'}
+            </button>
             <button onClick={loadSessions} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' }}>📊 History</button>
             <button onClick={resetAll} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' }}>🔄 Restart</button>
             <button onClick={handleLogout} style={{ padding: '8px 12px', background: 'rgba(255,0,0,0.3)', border: '1px solid rgba(255,0,0,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' }}>🚪 Logout</button>
@@ -529,6 +523,26 @@ function App() {
           </div>
         )}
 
+        {step >= 3 && warnings > 0 && (
+          <div style={{ background: 'rgba(255,0,0,0.3)', padding: '12px 20px', borderRadius: '8px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '20px' }}>⚠️</span>
+            <p style={{ color: 'white', margin: 0, fontSize: '14px' }}>
+              <strong>Warning {warnings}/3</strong> — Do not switch tabs during the interview!
+            </p>
+          </div>
+        )}
+
+        {interviewEnded && (
+          <div style={{ background: 'rgba(255,0,0,0.5)', padding: '25px', borderRadius: '12px', marginBottom: '15px', textAlign: 'center', backdropFilter: 'blur(10px)' }}>
+            <h2 style={{ color: 'white', marginTop: 0 }}>🚨 Interview Terminated!</h2>
+            <p style={{ color: 'rgba(255,255,255,0.9)' }}>You switched tabs/windows 3 times.</p>
+            <button onClick={() => { resetAll(); setWarnings(0); setInterviewEnded(false); }}
+              style={{ padding: '10px 25px', background: 'white', color: '#c00', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
+              🔄 Start Over
+            </button>
+          </div>
+        )}
+
         <div style={{ background: 'rgba(255,255,255,0.1)', padding: '25px', borderRadius: '12px', marginBottom: '15px', backdropFilter: 'blur(10px)' }}>
           <h3 style={{ color: 'white', marginTop: 0 }}>📄 Step 1 — Upload Your Resume</h3>
           <input type="file" accept=".pdf" onChange={(e) => setFile(e.target.files[0])} style={{ margin: '10px 0', color: 'white' }} />
@@ -545,25 +559,6 @@ function App() {
             <button onClick={generateQuestions} disabled={loading}
               style={{ padding: '10px 25px', background: selectedRole.text, color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}>
               {loading ? '⏳ Generating...' : `🤖 Generate ${selectedMode} Questions`}
-            </button>
-          </div>
-        )}
-        {step >= 3 && warnings > 0 && (
-          <div style={{ background: 'rgba(255,0,0,0.3)', padding: '12px 20px', borderRadius: '8px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '20px' }}>⚠️</span>
-            <p style={{ color: 'white', margin: 0, fontSize: '14px' }}>
-              <strong>Warning {warnings}/3</strong> — Do not switch tabs or leave this window during the interview!
-            </p>
-          </div>
-        )}
-
-        {interviewEnded && (
-          <div style={{ background: 'rgba(255,0,0,0.5)', padding: '25px', borderRadius: '12px', marginBottom: '15px', textAlign: 'center', backdropFilter: 'blur(10px)' }}>
-            <h2 style={{ color: 'white', marginTop: 0 }}>🚨 Interview Terminated!</h2>
-            <p style={{ color: 'rgba(255,255,255,0.9)' }}>You switched tabs/windows 3 times. This behavior has been recorded.</p>
-            <button onClick={() => { resetAll(); setWarnings(0); setInterviewEnded(false); }}
-              style={{ padding: '10px 25px', background: 'white', color: '#c00', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
-              🔄 Start Over
             </button>
           </div>
         )}
@@ -600,17 +595,14 @@ function App() {
           <div style={{ background: 'rgba(255,255,255,0.15)', padding: '25px', borderRadius: '12px', marginBottom: '15px', backdropFilter: 'blur(10px)' }}>
             <h3 style={{ color: 'white', marginTop: 0 }}>📊 AI Feedback</h3>
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)' }}>{feedback}</pre>
-            
             <button onClick={getIdealAnswer} disabled={loading}
               style={{ marginTop: '15px', padding: '10px 25px', background: '#FF6F00', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px', marginRight: '10px' }}>
               {loading ? '⏳ Loading...' : '💡 Show Ideal Answer'}
             </button>
-
             <button onClick={resetAll}
               style={{ marginTop: '15px', padding: '10px 25px', background: selectedRole.text, color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
               🔄 Start New Session
             </button>
-
             {showIdeal && idealAnswer && (
               <div style={{ background: 'rgba(0,255,0,0.1)', padding: '20px', borderRadius: '12px', marginTop: '20px', border: '1px solid rgba(0,255,0,0.3)' }}>
                 <h3 style={{ color: '#64ffda', marginTop: 0 }}>💡 Ideal Answer & Comparison</h3>
@@ -619,6 +611,7 @@ function App() {
             )}
           </div>
         )}
+
       </div>
     </div>
   );
