@@ -195,3 +195,80 @@ async def ideal_answer(data: dict):
         messages=[{"role": "user", "content": prompt}]
     )
     return {"ideal_answer": response.choices[0].message.content}
+@app.post("/panel-questions")
+async def panel_questions(data: dict):
+    resume_text = data.get("resume_text", "")
+    role = data.get("role", "")
+    language = data.get("language", "English")
+    prompt = f"""
+    You are organizing a mock panel interview for a {role} position.
+    
+    Based on this resume:
+    {resume_text}
+    
+    Generate ONE question from each of these 3 panelists:
+    
+    1. 👨‍💼 TECHNICAL EXPERT (Dr. Sharma): Ask a deep technical question specific to their skills
+    2. 👩‍💼 HR MANAGER (Ms. Priya): Ask a behavioral/situational question
+    3. 👴 SENIOR DIRECTOR (Mr. Mehta): Ask a strategic/leadership/vision question
+    
+    Format exactly like this:
+    👨‍💼 Dr. Sharma (Technical Expert):
+    [question here]
+    
+    👩‍💼 Ms. Priya (HR Manager):
+    [question here]
+    
+    👴 Mr. Mehta (Senior Director):
+    [question here]
+    
+    Respond in {language} language only.
+    """
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return {"panel_questions": response.choices[0].message.content}
+
+@app.post("/panel-feedback")
+async def panel_feedback(data: dict):
+    answer = data.get("answer", "")
+    questions = data.get("questions", "")
+    role = data.get("role", "")
+    language = data.get("language", "English")
+    prompt = f"""
+    A candidate for {role} position was asked these panel interview questions:
+    {questions}
+    
+    Their answer was:
+    {answer}
+    
+    Now each panelist gives their individual feedback:
+    
+    👨‍💼 DR. SHARMA (Technical Expert) Feedback:
+    - Technical accuracy score (out of 10)
+    - What was technically good
+    - What technical knowledge was missing
+    
+    👩‍💼 MS. PRIYA (HR Manager) Feedback:
+    - Communication score (out of 10)
+    - What behavioral aspects were good
+    - What soft skills need improvement
+    
+    👴 MR. MEHTA (Senior Director) Feedback:
+    - Leadership/Vision score (out of 10)
+    - What strategic thinking was shown
+    - What needs improvement
+    
+    🏆 PANEL VERDICT:
+    - Overall Panel Score (out of 100)
+    - Hiring Recommendation (Strong Yes / Yes / Maybe / No)
+    - One key advice from the panel
+    
+    Respond in {language} language only.
+    """
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return {"panel_feedback": response.choices[0].message.content}

@@ -2,8 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 
 const CATEGORIES = [
   {
-    id: 'tech',
-    label: '💻 Technology',
+    id: 'tech', label: '💻 Technology',
     bg: 'linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), url("https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=1200")',
     roles: [
       { id: 'software', label: '💻 Software Engineer', text: '#58a6ff', modes: ['📝 Technical Round', '👔 HR Round', '💻 Coding Round', '🏗️ System Design Round'] },
@@ -19,8 +18,7 @@ const CATEGORIES = [
     ]
   },
   {
-    id: 'government',
-    label: '🏛️ Government',
+    id: 'government', label: '🏛️ Government',
     bg: 'linear-gradient(rgba(10,20,80,0.8), rgba(10,20,80,0.8)), url("https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=1200")',
     roles: [
       { id: 'ssc', label: '📝 SSC CGL/CHSL', text: '#ffffff', modes: ['📝 General Awareness', '🧮 Quantitative Aptitude', '📖 English', '🧠 Reasoning', '🎤 Interview Round'] },
@@ -34,8 +32,7 @@ const CATEGORIES = [
     ]
   },
   {
-    id: 'business',
-    label: '👔 Business',
+    id: 'business', label: '👔 Business',
     bg: 'linear-gradient(rgba(0,50,0,0.8), rgba(0,50,0,0.8)), url("https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=1200")',
     roles: [
       { id: 'hr', label: '👔 HR Manager', text: '#ffffff', modes: ['👔 HR Round', '🤝 Behavioral Round', '📊 Case Study', '🎭 Role Play'] },
@@ -49,8 +46,7 @@ const CATEGORIES = [
     ]
   },
   {
-    id: 'creative',
-    label: '🎨 Creative',
+    id: 'creative', label: '🎨 Creative',
     bg: 'linear-gradient(rgba(60,0,100,0.8), rgba(60,0,100,0.8)), url("https://images.unsplash.com/photo-1561070791-2526d30994b5?w=1200")',
     roles: [
       { id: 'uiux', label: '🎨 UI/UX Designer', text: '#ffffff', modes: ['🎨 Portfolio Review', '👔 HR Round', '🖥️ Design Challenge', '🤝 Behavioral Round'] },
@@ -62,8 +58,7 @@ const CATEGORIES = [
     ]
   },
   {
-    id: 'other',
-    label: '🏥 Other Fields',
+    id: 'other', label: '🏥 Other Fields',
     bg: 'linear-gradient(rgba(120,0,0,0.8), rgba(120,0,0,0.8)), url("https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=1200")',
     roles: [
       { id: 'medical', label: '🏥 Medical / Doctor', text: '#ffffff', modes: ['🏥 Clinical Round', '👔 HR Round', '📚 Subject Knowledge', '🎤 Viva Round'] },
@@ -77,7 +72,6 @@ const CATEGORIES = [
 ];
 
 const BG = 'linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("https://images.unsplash.com/photo-1573164713988-8665fc963095?w=1200")';
-
 const isMobile = window.innerWidth <= 600;
 
 function App() {
@@ -105,6 +99,9 @@ function App() {
   const [selectedMode, setSelectedMode] = useState(null);
   const [warnings, setWarnings] = useState(0);
   const [interviewEnded, setInterviewEnded] = useState(false);
+  const [panelMode, setPanelMode] = useState(false);
+  const [panelQuestions, setPanelQuestions] = useState('');
+  const [panelFeedback, setPanelFeedback] = useState('');
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
 
@@ -126,11 +123,17 @@ function App() {
         });
       }
     };
+   let alertShowing = false;
     const handleBlur = () => {
+      if (alertShowing) return;
+      alertShowing = true;
       setWarnings(prev => {
         const n = prev + 1;
-        if (n >= 3) { setInterviewEnded(true); alert('🚨 Interview Terminated!'); }
-        else { alert(`⚠️ Warning ${n}/3! Do not leave the window!`); }
+        setTimeout(() => {
+          if (n >= 3) { setInterviewEnded(true); alert('🚨 Interview Terminated!'); }
+          else { alert(`⚠️ Warning ${n}/3! Do not leave the window!`); }
+          alertShowing = false;
+        }, 500);
         return n;
       });
     };
@@ -180,6 +183,30 @@ function App() {
     });
     const data = await res.json();
     setQuestions(data.questions); setStep(3); setLoading(false);
+  };
+
+  const startPanelInterview = async () => {
+    setLoading(true);
+    const res = await fetch('http://localhost:8000/panel-questions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resume_text: resumeText, role: selectedRole.label, language }),
+    });
+    const data = await res.json();
+    setPanelQuestions(data.panel_questions);
+    setPanelMode(true);
+    setStep(3);
+    setLoading(false);
+  };
+
+  const getPanelFeedback = async () => {
+    if (!transcript) return alert('Please record or type your answer first!');
+    setLoading(true);
+    const res = await fetch('http://localhost:8000/panel-feedback', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer: transcript, questions: panelQuestions, role: selectedRole.label, language }),
+    });
+    const data = await res.json();
+    setPanelFeedback(data.panel_feedback); setLoading(false);
   };
 
   const startRecording = async () => {
@@ -239,9 +266,9 @@ function App() {
     setTranscript(''); setFeedback(''); setIdealAnswer(''); setShowIdeal(false);
     setSelectedCategory(null); setSelectedRole(null); setSelectedMode(null);
     setWarnings(0); setInterviewEnded(false);
+    setPanelMode(false); setPanelQuestions(''); setPanelFeedback('');
   };
 
-  // Styles
   const fullBg = (bg) => ({ minHeight: '100vh', background: bg, backgroundSize: 'cover', backgroundPosition: 'center' });
   const centerFlex = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' };
   const card = { background: 'rgba(255,255,255,0.1)', padding: isMobile ? '25px 20px' : '40px', borderRadius: '16px', maxWidth: '400px', width: '100%', backdropFilter: 'blur(10px)' };
@@ -422,7 +449,7 @@ function App() {
           <div style={{ background: 'rgba(255,0,0,0.5)', padding: '25px', borderRadius: '12px', marginBottom: '15px', textAlign: 'center' }}>
             <h2 style={{ color: 'white', marginTop: 0 }}>🚨 Interview Terminated!</h2>
             <p style={{ color: 'rgba(255,255,255,0.9)' }}>You switched tabs 3 times.</p>
-            <button onClick={() => { resetAll(); setWarnings(0); setInterviewEnded(false); }}
+            <button onClick={() => { resetAll(); }}
               style={{ padding: '10px 25px', background: 'white', color: '#c00', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
               🔄 Start Over
             </button>
@@ -444,22 +471,26 @@ function App() {
         {step >= 2 && (
           <div style={glassBox}>
             <h3 style={{ color: 'white', marginTop: 0 }}>✅ Resume Uploaded!</h3>
-            <button onClick={generateQuestions} disabled={loading}
-              style={{ padding: '10px 20px', background: selectedRole.text, color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold' }}>
-              {loading ? '⏳ Generating...' : `🤖 Generate ${selectedMode} Questions`}
-            </button>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button onClick={generateQuestions} disabled={loading}
+                style={{ padding: '10px 20px', background: selectedRole.text, color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold' }}>
+                {loading ? '⏳ Generating...' : `🤖 Generate ${selectedMode} Questions`}
+              </button>
+              <button onClick={startPanelInterview} disabled={loading}
+                style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #185FA5, #7B1FA2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold' }}>
+                {loading ? '⏳ Loading...' : '👥 Start Panel Interview'}
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Step 3 */}
-        {step >= 3 && (
+        {/* Step 3 — Normal Questions */}
+        {step >= 3 && !panelMode && (
           <div style={glassBox}>
             <h3 style={{ color: 'white', marginTop: 0 }}>🎯 {selectedMode} Questions</h3>
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: isMobile ? '13px' : '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)', overflowX: 'auto' }}>{questions}</pre>
-
             <h3 style={{ color: 'white', marginTop: '20px' }}>🎙️ Record Your Answer</h3>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Works on ALL browsers!</p>
-
             <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
               <button onClick={startRecording} disabled={isRecording}
                 style={{ padding: '10px 18px', background: isRecording ? '#555' : '#e53935', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>
@@ -470,14 +501,11 @@ function App() {
                 ⏹️ Stop & Transcribe
               </button>
             </div>
-
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>Or type your answer:</p>
             <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)}
               placeholder="Speak or type your answer here..."
               style={{ width: '100%', height: '100px', padding: '10px', borderRadius: '8px', border: 'none', fontSize: '14px', marginBottom: '15px', background: 'rgba(255,255,255,0.9)', boxSizing: 'border-box' }} />
-
             {loading && <p style={{ color: selectedRole.text }}>⏳ Processing...</p>}
-
             <button onClick={getAIFeedback} disabled={loading || !transcript}
               style={{ padding: '10px 20px', background: '#7B1FA2', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '13px' : '15px' }}>
               {loading ? '⏳ Analyzing...' : '📊 Get AI Feedback & Score'}
@@ -485,12 +513,51 @@ function App() {
           </div>
         )}
 
-        {/* Feedback */}
+        {/* Panel Interview */}
+        {panelMode && panelQuestions && (
+          <div style={{ ...glassBox, background: 'rgba(100,0,150,0.2)', border: '1px solid rgba(150,0,255,0.3)' }}>
+            <h3 style={{ color: '#ce93d8', marginTop: 0 }}>👥 Mock Panel Interview</h3>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', marginBottom: '15px' }}>3 interviewers are waiting for your answer!</p>
+            <pre style={{ whiteSpace: 'pre-wrap', fontSize: isMobile ? '13px' : '14px', lineHeight: '2', color: 'rgba(255,255,255,0.9)', overflowX: 'auto' }}>{panelQuestions}</pre>
+            <h3 style={{ color: 'white', marginTop: '20px' }}>🎙️ Your Answer to the Panel</h3>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+              <button onClick={startRecording} disabled={isRecording}
+                style={{ padding: '10px 18px', background: isRecording ? '#555' : '#e53935', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                {isRecording ? '🔴 Recording...' : '🔴 Start Recording'}
+              </button>
+              <button onClick={stopRecording} disabled={!isRecording}
+                style={{ padding: '10px 18px', background: !isRecording ? '#555' : '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                ⏹️ Stop & Transcribe
+              </button>
+            </div>
+            <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)}
+              placeholder="Speak or type your answer to the panel..."
+              style={{ width: '100%', height: '100px', padding: '10px', borderRadius: '8px', border: 'none', fontSize: '14px', marginBottom: '15px', background: 'rgba(255,255,255,0.9)', boxSizing: 'border-box' }} />
+            {loading && <p style={{ color: '#ce93d8' }}>⏳ Panel is evaluating...</p>}
+            <button onClick={getPanelFeedback} disabled={loading || !transcript}
+              style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #185FA5, #7B1FA2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}>
+              {loading ? '⏳ Evaluating...' : '👥 Get Panel Verdict'}
+            </button>
+          </div>
+        )}
+
+        {/* Panel Feedback */}
+        {panelFeedback && (
+          <div style={{ ...glassBox, background: 'rgba(100,0,150,0.2)', border: '1px solid rgba(150,0,255,0.3)' }}>
+            <h3 style={{ color: '#ce93d8', marginTop: 0 }}>👥 Panel Verdict</h3>
+            <pre style={{ whiteSpace: 'pre-wrap', fontSize: isMobile ? '13px' : '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)', overflowX: 'auto' }}>{panelFeedback}</pre>
+            <button onClick={() => { setPanelMode(false); setPanelQuestions(''); setPanelFeedback(''); setTranscript(''); }}
+              style={{ marginTop: '15px', padding: '10px 20px', background: 'linear-gradient(135deg, #185FA5, #7B1FA2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+              🔄 New Panel Interview
+            </button>
+          </div>
+        )}
+
+        {/* Normal Feedback */}
         {feedback && (
           <div style={{ ...glassBox, background: 'rgba(255,255,255,0.15)' }}>
             <h3 style={{ color: 'white', marginTop: 0 }}>📊 AI Feedback</h3>
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: isMobile ? '13px' : '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)', overflowX: 'auto' }}>{feedback}</pre>
-
             <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
               <button onClick={getIdealAnswer} disabled={loading}
                 style={{ padding: '10px 20px', background: '#FF6F00', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: isMobile ? '13px' : '15px' }}>
@@ -501,7 +568,6 @@ function App() {
                 🔄 New Session
               </button>
             </div>
-
             {showIdeal && idealAnswer && (
               <div style={{ background: 'rgba(0,255,0,0.1)', padding: '20px', borderRadius: '12px', marginTop: '20px', border: '1px solid rgba(0,255,0,0.3)' }}>
                 <h3 style={{ color: '#64ffda', marginTop: 0 }}>💡 Ideal Answer & Comparison</h3>
