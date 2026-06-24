@@ -111,6 +111,9 @@ function App() {
   const [weakTopics, setWeakTopics] = useState('');
   const [showWeakTopics, setShowWeakTopics] = useState(false);
   const [newBadge, setNewBadge] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(120);
+  const [timerActive, setTimerActive] = useState(false);
+  const timerRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
 
@@ -316,6 +319,34 @@ const analyzeWeakTopics = async () => {
     setSelectedCategory(null); setSelectedRole(null); setSelectedMode(null);
     setWarnings(0); setInterviewEnded(false);
     setPanelMode(false); setPanelQuestions(''); setPanelFeedback('');
+    clearInterval(timerRef.current);
+    setTimeLeft(120); setTimerActive(false);
+  };
+  const startTimer = () => {
+    setTimeLeft(120);
+    setTimerActive(true);
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          setTimerActive(false);
+          alert('⏰ Time is up! Please submit your answer.');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const stopTimer = () => {
+    clearInterval(timerRef.current);
+    setTimerActive(false);
+  };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   const fullBg = (bg) => ({ minHeight: '100vh', background: bg, backgroundSize: 'cover', backgroundPosition: 'center' });
@@ -549,7 +580,23 @@ const analyzeWeakTopics = async () => {
           <div style={glassBox}>
             <h3 style={{ color: 'white', marginTop: 0 }}>🎯 {selectedMode} Questions</h3>
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: isMobile ? '13px' : '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)', overflowX: 'auto' }}>{questions}</pre>
-            <h3 style={{ color: 'white', marginTop: '20px' }}>🎙️ Record Your Answer</h3>
+           <h3 style={{ color: 'white', marginTop: '20px' }}>🎙️ Record Your Answer</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
+              <div style={{ background: timeLeft <= 30 ? 'rgba(255,0,0,0.3)' : 'rgba(255,255,255,0.1)', padding: '10px 20px', borderRadius: '8px', border: `2px solid ${timeLeft <= 30 ? '#f44336' : 'rgba(255,255,255,0.3)'}` }}>
+                <span style={{ color: timeLeft <= 30 ? '#ff5252' : 'white', fontSize: '24px', fontWeight: 'bold', fontFamily: 'monospace' }}>⏱️ {formatTime(timeLeft)}</span>
+              </div>
+              {!timerActive ? (
+                <button onClick={startTimer}
+                  style={{ padding: '10px 20px', background: '#185FA5', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>
+                  ▶️ Start Timer
+                </button>
+              ) : (
+                <button onClick={stopTimer}
+                  style={{ padding: '10px 20px', background: '#555', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>
+                  ⏸️ Pause Timer
+                </button>
+              )}
+            </div>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Works on ALL browsers!</p>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
               <button onClick={startRecording} disabled={isRecording}
