@@ -108,6 +108,8 @@ function App() {
   const [panelMode, setPanelMode] = useState(false);
   const [panelQuestions, setPanelQuestions] = useState('');
   const [panelFeedback, setPanelFeedback] = useState('');
+  const [weakTopics, setWeakTopics] = useState('');
+  const [showWeakTopics, setShowWeakTopics] = useState(false);
   const [newBadge, setNewBadge] = useState(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -291,7 +293,17 @@ function App() {
     const data = await res.json();
     setIdealAnswer(data.ideal_answer); setShowIdeal(true); setLoading(false);
   };
-
+const analyzeWeakTopics = async () => {
+    setLoading(true);
+    const res = await fetch('http://localhost:8001/analyze-weak-topics', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feedback, role: selectedRole.label, language }),
+    });
+    const data = await res.json();
+    setWeakTopics(data.weak_topics);
+    setShowWeakTopics(true);
+    setLoading(false);
+  };
   const loadSessions = async () => {
     const res = await fetch(`http://localhost:8001/sessions?email=${loggedInEmail}`);
     const data = await res.json();
@@ -607,6 +619,10 @@ function App() {
             <h3 style={{ color: 'white', marginTop: 0 }}>📊 AI Feedback</h3>
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: isMobile ? '13px' : '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)', overflowX: 'auto' }}>{feedback}</pre>
             <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
+            <button onClick={analyzeWeakTopics} disabled={loading}
+                style={{ padding: '10px 20px', background: '#e53935', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: isMobile ? '13px' : '15px' }}>
+                {loading ? '⏳ Analyzing...' : '🎯 Analyze Weak Topics'}
+              </button>
               <button onClick={getIdealAnswer} disabled={loading}
                 style={{ padding: '10px 20px', background: '#FF6F00', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: isMobile ? '13px' : '15px' }}>
                 {loading ? '⏳ Loading...' : '💡 Show Ideal Answer'}
@@ -616,6 +632,12 @@ function App() {
                 🔄 New Session
               </button>
             </div>
+            {showWeakTopics && weakTopics && (
+              <div style={{ background: 'rgba(255,0,0,0.1)', padding: '20px', borderRadius: '12px', marginTop: '20px', border: '1px solid rgba(255,0,0,0.3)' }}>
+                <h3 style={{ color: '#ff8a65', marginTop: 0 }}>🎯 Weak Topic Analysis</h3>
+                <pre style={{ whiteSpace: 'pre-wrap', fontSize: isMobile ? '13px' : '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)', overflowX: 'auto' }}>{weakTopics}</pre>
+              </div>
+            )}
             {showIdeal && idealAnswer && (
               <div style={{ background: 'rgba(0,255,0,0.1)', padding: '20px', borderRadius: '12px', marginTop: '20px', border: '1px solid rgba(0,255,0,0.3)' }}>
                 <h3 style={{ color: '#64ffda', marginTop: 0 }}>💡 Ideal Answer & Comparison</h3>

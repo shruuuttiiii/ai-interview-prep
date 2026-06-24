@@ -272,3 +272,27 @@ async def panel_feedback(data: dict):
         messages=[{"role": "user", "content": prompt}]
     )
     return {"panel_feedback": response.choices[0].message.content}
+@app.post("/analyze-weak-topics")
+async def analyze_weak_topics(data: dict):
+    feedback = data.get("feedback", "")
+    role = data.get("role", "")
+    language = data.get("language", "English")
+    prompt = f"""
+    Based on this interview feedback for {role}:
+    {feedback}
+    
+    Identify and list:
+    1. 🔴 WEAK TOPICS — Areas where candidate struggled (be specific)
+    2. 🟡 AVERAGE TOPICS — Areas that need improvement
+    3. 🟢 STRONG TOPICS — Areas candidate did well
+    4. 📚 STUDY PLAN — Top 3 specific things to study/practice next
+    
+    Be very specific about topic names (e.g. "Binary Search Trees", "System Design", "STAR Method" etc.)
+    Respond in {language} language only.
+    Format clearly with emoji headers.
+    """
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return {"weak_topics": response.choices[0].message.content}
