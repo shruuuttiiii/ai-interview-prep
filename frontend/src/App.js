@@ -74,6 +74,12 @@ const CATEGORIES = [
 const BG = 'linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("https://images.unsplash.com/photo-1573164713988-8665fc963095?w=1200")';
 const isMobile = window.innerWidth <= 600;
 
+const BADGE_MAP = {
+  first_step: '🌟', on_fire: '🔥', veteran: '🎖️',
+  gold: '🥇', silver: '🥈', bronze: '🥉',
+  code_warrior: '💻', hr_pro: '👔', bilingual: '🌍', panel_master: '👥'
+};
+
 function App() {
   const [authMode, setAuthMode] = useState('checking');
   const [savedEmail, setSavedEmail] = useState('');
@@ -102,6 +108,7 @@ function App() {
   const [panelMode, setPanelMode] = useState(false);
   const [panelQuestions, setPanelQuestions] = useState('');
   const [panelFeedback, setPanelFeedback] = useState('');
+  const [newBadge, setNewBadge] = useState(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
 
@@ -117,33 +124,54 @@ function App() {
       if (document.hidden) {
         setWarnings(prev => {
           const n = prev + 1;
-          if (n >= 3) { setInterviewEnded(true); alert('🚨 Interview Terminated!'); }
-          else { alert(`⚠️ Warning ${n}/3! Do not switch tabs!`); }
+          if (n >= 3) {
+            setInterviewEnded(true);
+            alert('🚨 Interview Terminated! You switched tabs 3 times.');
+          } else {
+            alert(`⚠️ Warning ${n}/3! Do not switch tabs during the interview!`);
+          }
           return n;
         });
       }
     };
-   let alertShowing = false;
-    const handleBlur = () => {
-      if (alertShowing) return;
-      alertShowing = true;
-      setWarnings(prev => {
-        const n = prev + 1;
-        setTimeout(() => {
-          if (n >= 3) { setInterviewEnded(true); alert('🚨 Interview Terminated!'); }
-          else { alert(`⚠️ Warning ${n}/3! Do not leave the window!`); }
-          alertShowing = false;
-        }, 500);
-        return n;
-      });
-    };
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
     };
   }, [step]);
+
+  const checkAndAwardBadges = (feedbackText, sessionCount) => {
+    const earned = JSON.parse(localStorage.getItem('ai_interview_badges_' + loggedInEmail) || '[]');
+    const newBadges = [];
+    if (sessionCount >= 1 && !earned.includes('first_step'))
+      newBadges.push({ id: 'first_step', emoji: '🌟', name: 'First Step', desc: 'Completed your first interview!' });
+    if (sessionCount >= 5 && !earned.includes('on_fire'))
+      newBadges.push({ id: 'on_fire', emoji: '🔥', name: 'On Fire', desc: 'Completed 5 interviews!' });
+    if (sessionCount >= 10 && !earned.includes('veteran'))
+      newBadges.push({ id: 'veteran', emoji: '🎖️', name: 'Veteran', desc: 'Completed 10 interviews!' });
+    const score = feedbackText.match(/\b([5-9]\d|100)\b/);
+    if (score) {
+      const s = parseInt(score[1]);
+      if (s >= 90 && !earned.includes('gold'))
+        newBadges.push({ id: 'gold', emoji: '🥇', name: 'Gold', desc: 'Scored 90+ in an interview!' });
+      else if (s >= 70 && !earned.includes('silver'))
+        newBadges.push({ id: 'silver', emoji: '🥈', name: 'Silver', desc: 'Scored 70+ in an interview!' });
+      else if (s >= 50 && !earned.includes('bronze'))
+        newBadges.push({ id: 'bronze', emoji: '🥉', name: 'Bronze', desc: 'Scored 50+ in an interview!' });
+    }
+    if (selectedMode && selectedMode.includes('Coding') && !earned.includes('code_warrior'))
+      newBadges.push({ id: 'code_warrior', emoji: '💻', name: 'Code Warrior', desc: 'Completed a Coding Round!' });
+    if (selectedMode && selectedMode.includes('HR') && !earned.includes('hr_pro'))
+      newBadges.push({ id: 'hr_pro', emoji: '👔', name: 'HR Pro', desc: 'Completed an HR Round!' });
+    if (language === 'Hindi' && !earned.includes('bilingual'))
+      newBadges.push({ id: 'bilingual', emoji: '🌍', name: 'Bilingual', desc: 'Used Hindi mode!' });
+    if (newBadges.length > 0) {
+      const allEarned = [...earned, ...newBadges.map(b => b.id)];
+      localStorage.setItem('ai_interview_badges_' + loggedInEmail, JSON.stringify(allEarned));
+      setNewBadge(newBadges[0]);
+      setTimeout(() => setNewBadge(null), 4000);
+    }
+  };
 
   const handleRegister = () => {
     if (!email.includes('@')) return alert('Please enter a valid email!');
@@ -170,14 +198,14 @@ function App() {
     setLoading(true);
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch('http://localhost:8000/upload-resume', { method: 'POST', body: formData });
+    const res = await fetch('http://localhost:8001/upload-resume', { method: 'POST', body: formData });
     const data = await res.json();
     setResumeText(data.full_text); setStep(2); setLoading(false);
   };
 
   const generateQuestions = async () => {
     setLoading(true);
-    const res = await fetch('http://localhost:8000/generate-questions', {
+    const res = await fetch('http://localhost:8001/generate-questions', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resume_text: resumeText, role: selectedRole.label, mode: selectedMode, language }),
     });
@@ -187,26 +215,32 @@ function App() {
 
   const startPanelInterview = async () => {
     setLoading(true);
-    const res = await fetch('http://localhost:8000/panel-questions', {
+    const res = await fetch('http://localhost:8001/panel-questions', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resume_text: resumeText, role: selectedRole.label, language }),
     });
     const data = await res.json();
     setPanelQuestions(data.panel_questions);
-    setPanelMode(true);
-    setStep(3);
-    setLoading(false);
+    setPanelMode(true); setStep(3); setLoading(false);
   };
 
   const getPanelFeedback = async () => {
     if (!transcript) return alert('Please record or type your answer first!');
     setLoading(true);
-    const res = await fetch('http://localhost:8000/panel-feedback', {
+    const res = await fetch('http://localhost:8001/panel-feedback', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answer: transcript, questions: panelQuestions, role: selectedRole.label, language }),
     });
     const data = await res.json();
-    setPanelFeedback(data.panel_feedback); setLoading(false);
+    setPanelFeedback(data.panel_feedback);
+    const earned = JSON.parse(localStorage.getItem('ai_interview_badges_' + loggedInEmail) || '[]');
+    if (!earned.includes('panel_master')) {
+      const allEarned = [...earned, 'panel_master'];
+      localStorage.setItem('ai_interview_badges_' + loggedInEmail, JSON.stringify(allEarned));
+      setNewBadge({ id: 'panel_master', emoji: '👥', name: 'Panel Master', desc: 'Completed a Panel Interview!' });
+      setTimeout(() => setNewBadge(null), 4000);
+    }
+    setLoading(false);
   };
 
   const startRecording = async () => {
@@ -228,7 +262,7 @@ function App() {
       const formData = new FormData();
       formData.append('file', blob, 'recording.webm');
       setLoading(true);
-      const res = await fetch('http://localhost:8000/transcribe', { method: 'POST', body: formData });
+      const res = await fetch('http://localhost:8001/transcribe', { method: 'POST', body: formData });
       const data = await res.json();
       setTranscript(data.transcript); setLoading(false);
     };
@@ -237,17 +271,20 @@ function App() {
   const getAIFeedback = async () => {
     if (!transcript) return alert('Please record or type your answer first!');
     setLoading(true);
-    const res = await fetch('http://localhost:8000/get-feedback', {
+    const res = await fetch('http://localhost:8001/get-feedback', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answer: transcript, questions, email: loggedInEmail, role: selectedRole.label, mode: selectedMode, language }),
     });
     const data = await res.json();
     setFeedback(data.feedback); setLoading(false);
+    const sessRes = await fetch(`http://localhost:8001/sessions?email=${loggedInEmail}`);
+    const sessData = await sessRes.json();
+    checkAndAwardBadges(data.feedback, sessData.length);
   };
 
   const getIdealAnswer = async () => {
     setLoading(true);
-    const res = await fetch('http://localhost:8000/ideal-answer', {
+    const res = await fetch('http://localhost:8001/ideal-answer', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ questions, role: selectedRole.label, mode: selectedMode, user_answer: transcript, language }),
     });
@@ -256,7 +293,7 @@ function App() {
   };
 
   const loadSessions = async () => {
-    const res = await fetch(`http://localhost:8000/sessions?email=${loggedInEmail}`);
+    const res = await fetch(`http://localhost:8001/sessions?email=${loggedInEmail}`);
     const data = await res.json();
     setSessions(data); setShowHistory(true);
   };
@@ -276,6 +313,7 @@ function App() {
   const glassBox = { background: 'rgba(255,255,255,0.1)', padding: isMobile ? '15px' : '25px', borderRadius: '12px', marginBottom: '15px', backdropFilter: 'blur(10px)' };
   const btnGlass = { padding: isMobile ? '14px 10px' : '18px 15px', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.3)', borderRadius: '12px', color: 'white', fontSize: isMobile ? '13px' : '14px', cursor: 'pointer', backdropFilter: 'blur(10px)', textAlign: 'center' };
   const grid2 = { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: isMobile ? '10px' : '15px', maxWidth: '500px', width: '100%', padding: '0 10px' };
+  const myBadges = JSON.parse(localStorage.getItem('ai_interview_badges_' + loggedInEmail) || '[]');
 
   if (authMode === 'checking') return (
     <div style={{ ...fullBg(BG), ...centerFlex }}>
@@ -328,10 +366,15 @@ function App() {
           style={{ padding: '7px 12px', background: language === 'Hindi' ? '#FF9800' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>
           {language === 'English' ? '🇮🇳 Hindi' : '🇬🇧 English'}
         </button>
-        <button onClick={loadSessions} style={{ padding: '7px 12px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>📊 History</button>
-        <button onClick={handleLogout} style={{ padding: '7px 12px', background: 'rgba(255,0,0,0.3)', border: '1px solid rgba(255,0,0,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>🚪 Logout</button>
+        <button onClick={loadSessions} title="View History" style={{ padding: '7px 12px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>📊 History</button>
+        <button onClick={handleLogout} title="Logout" style={{ padding: '7px 12px', background: 'rgba(255,0,0,0.3)', border: '1px solid rgba(255,0,0,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>🚪 Logout</button>
       </div>
       <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '5px', fontSize: '12px', marginTop: '60px' }}>👤 {loggedInEmail}</p>
+      {myBadges.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {myBadges.map((b, i) => <span key={i} title={b} style={{ fontSize: '20px' }}>{BADGE_MAP[b] || '🏅'}</span>)}
+        </div>
+      )}
       <h1 style={{ color: 'white', fontSize: isMobile ? '26px' : '36px', marginBottom: '10px', textAlign: 'center' }}>🤖 AI Interview Prep</h1>
       <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '25px', fontSize: '15px' }}>Step 1 of 3 — Choose your field</p>
       <div style={grid2}>
@@ -407,15 +450,21 @@ function App() {
           <div>
             <h1 style={{ color: 'white', margin: 0, fontSize: isMobile ? '20px' : '24px' }}>🤖 AI Interview Prep</h1>
             <p style={{ color: selectedRole.text, margin: '3px 0', fontSize: '12px' }}>👤 {loggedInEmail} | {selectedRole.label} | {selectedMode}</p>
+            {myBadges.length > 0 && (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                {myBadges.map((b, i) => <span key={i} title={b.replace('_', ' ')} style={{ fontSize: '16px' }}>{BADGE_MAP[b] || '🏅'}</span>)}
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <button onClick={() => setLanguage(language === 'English' ? 'Hindi' : 'English')}
+              title={language === 'English' ? 'Switch to Hindi' : 'Switch to English'}
               style={{ padding: '7px 10px', background: language === 'Hindi' ? '#FF9800' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>
               {language === 'English' ? '🇮🇳 Hindi' : '🇬🇧 English'}
             </button>
-            <button onClick={loadSessions} style={{ padding: '7px 10px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>📊</button>
-            <button onClick={resetAll} style={{ padding: '7px 10px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>🔄</button>
-            <button onClick={handleLogout} style={{ padding: '7px 10px', background: 'rgba(255,0,0,0.3)', border: '1px solid rgba(255,0,0,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>🚪</button>
+            <button onClick={loadSessions} title="View Session History" style={{ padding: '7px 10px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>📊</button>
+            <button onClick={resetAll} title="Restart Interview" style={{ padding: '7px 10px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>🔄</button>
+            <button onClick={handleLogout} title="Logout" style={{ padding: '7px 10px', background: 'rgba(255,0,0,0.3)', border: '1px solid rgba(255,0,0,0.4)', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '12px' }}>🚪</button>
           </div>
         </div>
 
@@ -449,8 +498,7 @@ function App() {
           <div style={{ background: 'rgba(255,0,0,0.5)', padding: '25px', borderRadius: '12px', marginBottom: '15px', textAlign: 'center' }}>
             <h2 style={{ color: 'white', marginTop: 0 }}>🚨 Interview Terminated!</h2>
             <p style={{ color: 'rgba(255,255,255,0.9)' }}>You switched tabs 3 times.</p>
-            <button onClick={() => { resetAll(); }}
-              style={{ padding: '10px 25px', background: 'white', color: '#c00', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+            <button onClick={resetAll} style={{ padding: '10px 25px', background: 'white', color: '#c00', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
               🔄 Start Over
             </button>
           </div>
@@ -484,7 +532,7 @@ function App() {
           </div>
         )}
 
-        {/* Step 3 — Normal Questions */}
+        {/* Step 3 — Normal */}
         {step >= 3 && !panelMode && (
           <div style={glassBox}>
             <h3 style={{ color: 'white', marginTop: 0 }}>🎯 {selectedMode} Questions</h3>
@@ -574,6 +622,15 @@ function App() {
                 <pre style={{ whiteSpace: 'pre-wrap', fontSize: isMobile ? '13px' : '14px', lineHeight: '1.8', color: 'rgba(255,255,255,0.9)', overflowX: 'auto' }}>{idealAnswer}</pre>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Badge Popup */}
+        {newBadge && (
+          <div style={{ position: 'fixed', bottom: '30px', right: '30px', background: 'linear-gradient(135deg, #185FA5, #7B1FA2)', padding: '20px 25px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 1000 }}>
+            <p style={{ color: 'rgba(255,255,255,0.7)', margin: '0 0 5px', fontSize: '12px' }}>🏆 New Badge Earned!</p>
+            <p style={{ color: 'white', margin: 0, fontSize: '20px', fontWeight: 'bold' }}>{newBadge.emoji} {newBadge.name}</p>
+            <p style={{ color: 'rgba(255,255,255,0.8)', margin: '5px 0 0', fontSize: '13px' }}>{newBadge.desc}</p>
           </div>
         )}
 
