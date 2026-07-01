@@ -38,3 +38,12 @@ npm start
 ```
 
 ## 📁 Project Structure
+## 👩‍💻 Author & Copyright
+
+**Built by Shruti** — Final Year B.Tech Computer Science Student
+
+© 2024 Shruti. All Rights Reserved.
+This project was created and owned by Shruti.
+Unauthorized copying or claiming ownership is prohibited.
+
+⭐ If you find this helpful, please star the repository!

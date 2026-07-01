@@ -601,7 +601,12 @@ function App() {
         )}
 
       </div>
+      {/* Footer */}
+        <div style={{ textAlign: 'center', padding: '20px', marginTop: '20px', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>
+          © 2024 Shruti. All Rights Reserved. | Built by Shruti
+        </div>
     </div>
+    
   );
 }
 
