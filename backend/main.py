@@ -327,3 +327,69 @@ async def company_questions(data: dict):
         messages=[{"role": "user", "content": prompt}]
     )
     return {"questions": response.choices[0].message.content}
+@app.post("/coding-problem")
+async def coding_problem(data: dict):
+    role = data.get("role", "")
+    difficulty = data.get("difficulty", "Medium")
+    language = data.get("language", "English")
+    prompt = f"""
+    Generate a coding problem for a {role} interview.
+    Difficulty: {difficulty}
+    
+    Format exactly like this:
+    
+    🎯 PROBLEM TITLE: [title]
+    
+    📝 DESCRIPTION:
+    [problem description]
+    
+    📥 INPUT:
+    [input format]
+    
+    📤 OUTPUT:
+    [output format]
+    
+    💡 EXAMPLE:
+    Input: [example input]
+    Output: [example output]
+    
+    ⚡ CONSTRAINTS:
+    [constraints]
+    
+    🔑 HINT: [one small hint]
+    
+    Respond in {language} language only.
+    """
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return {"problem": response.choices[0].message.content}
+
+@app.post("/review-code")
+async def review_code(data: dict):
+    code = data.get("code", "")
+    problem = data.get("problem", "")
+    language = data.get("language", "English")
+    prompt = f"""
+    Problem:
+    {problem}
+    
+    Candidate's Code:
+    {code}
+    
+    Please provide:
+    1. ✅ CORRECTNESS — Does the code solve the problem? Any bugs?
+    2. ⏰ TIME COMPLEXITY — What is the time complexity? (Big O)
+    3. 💾 SPACE COMPLEXITY — What is the space complexity?
+    4. 🔧 IMPROVEMENTS — How can the code be optimized?
+    5. ✨ BEST SOLUTION — Show the optimal solution with explanation
+    6. 📊 SCORE — Rate the solution out of 100
+    
+    Respond in {language} language only.
+    """
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return {"review": response.choices[0].message.content}
