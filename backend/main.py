@@ -296,3 +296,34 @@ async def analyze_weak_topics(data: dict):
         messages=[{"role": "user", "content": prompt}]
     )
     return {"weak_topics": response.choices[0].message.content}
+@app.post("/company-questions")
+async def company_questions(data: dict):
+    resume_text = data.get("resume_text", "")
+    company = data.get("company", "")
+    role = data.get("role", "")
+    language = data.get("language", "English")
+    prompt = f"""
+    You are an interviewer at {company}. 
+    Generate 5 interview questions for a {role} position at {company}.
+    
+    Follow {company}'s specific interview style:
+    - Google: Focus on algorithms, system design, and problem solving
+    - Amazon: Focus on Leadership Principles (LP) and behavioral questions
+    - Microsoft: Focus on problem solving, culture fit, and technical depth
+    - TCS: Focus on basic technical knowledge, aptitude and HR questions
+    - Infosys: Focus on technical fundamentals and situational questions
+    - Wipro: Focus on technical skills and communication
+    - Startup: Focus on versatility, ownership, and quick learning
+    - Goldman Sachs: Focus on finance, analytical thinking and coding
+    
+    Candidate Resume:
+    {resume_text}
+    
+    Respond in {language} language only.
+    Format as numbered list only.
+    """
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return {"questions": response.choices[0].message.content}
