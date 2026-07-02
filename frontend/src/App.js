@@ -161,7 +161,7 @@ function App() {
 
   const handleLogout = () => { setLoggedInEmail(''); setPassword(''); setAuthMode('welcome-back'); resetAll(); };
 
-  const API = 'http://localhost:8001';
+  const API = 'https://ai-interview-prep-backend-cmdf.onrender.com';
 
   const uploadResume = async () => {
     if (!file) return alert('Please select a PDF file first!');
