@@ -1,3 +1,5 @@
+## 🌐 Live Demo
+👉 **[Click here to try it live!](https://ai-interview-prep-eight-dun.vercel.app)**
 # 🤖 AI Interview Preparation Platform
 
 An AI-powered full-stack web application that helps students and job seekers prepare for interviews using resume analysis, personalized question generation, and real-time feedback.
