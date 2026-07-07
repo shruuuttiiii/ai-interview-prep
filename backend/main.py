@@ -32,7 +32,7 @@ class Session(Base):
 Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(bind=engine)
 
-app = FastAPI()
+app = FastAPI() # v2
 
 app.add_middleware(
     CORSMiddleware,
